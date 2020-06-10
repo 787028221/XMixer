@@ -178,7 +178,18 @@ void XDecoder::audioWorkThread(void *opaque) {
 int XDecoder::decodeAudioFrame() {
     int ret = AVERROR(EAGAIN);
     for (;;) {
+        // get packet
+        auto pkt = mAudioPacketQueue->get();
+        if (!pkt) {
+            mStatus |= S_AUDIO_END;
+            return -1;
+        }
 
+        // send packet
+        ret = avcodec_send_packet(mAudioCodecCtx.get(), pkt->avpkt);
+        if (ret == AVERROR(EAGAIN)) {
+            continue;
+        }
         // receive frame
         do {
             auto frame = std::make_shared<Frame>();
@@ -203,19 +214,6 @@ int XDecoder::decodeAudioFrame() {
             }
 
         } while (ret != AVERROR(EAGAIN));
-
-        // get packet
-        auto pkt = mAudioPacketQueue->get();
-        if (!pkt) {
-            mStatus |= S_AUDIO_END;
-            return -1;
-        }
-
-        // send packet
-        ret = avcodec_send_packet(mAudioCodecCtx.get(), pkt->avpkt);
-        if (ret == AVERROR(EAGAIN)) {
-            continue;
-        }
     }
     return 0;
 }
